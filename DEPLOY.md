@@ -71,10 +71,11 @@ start --help`), so no start-command change is needed. No
 `/api/health` route exists; `/` is a static page with no DB call, so
 it is the health check. The local curl workaround for Prisma engines
 is not needed on Render (normal network — `prisma generate`
-downloads its engines itself). `preDeployCommand: npx prisma migrate
-deploy` is commented out in the Blueprint until the first migration
-exists (no `prisma/migrations/` folder yet — it would fail the
-deploy today).
+downloads its engines itself). Free tier does not support
+`preDeployCommand`, so the migration runs as the last step of
+`buildCommand` instead (`npm run build && npx prisma migrate
+deploy`). The first migration exists
+(`prisma/migrations/20261108202200_init`).
 
 **Recommendation for the $0 launch: Option B (Render).** Option A is
 the better long-term host but needs the two code changes above plus

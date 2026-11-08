@@ -36,7 +36,13 @@ services:
     # `npm run build` already runs `prisma generate && next build`;
     # generate is listed explicitly so it runs even if that script
     # is ever changed.
-    buildCommand: npm install && npx prisma generate && npm run build
+    buildCommand: npm install && npx prisma generate && npm run build && npx prisma migrate deploy
+    # Free tier does not support preDeployCommand, so the migration
+    # runs as the last build step instead. `migrate deploy` only
+    # applies pending migrations, so it is safe on every deploy.
+    # It needs DATABASE_URL and DIRECT_URL set in the dashboard
+    # before the first deploy, or the build fails at this step.
+    # First migration exists (prisma/migrations/20261108202200_init).
     # `next start` reads Render's PORT env var automatically and
     # binds 0.0.0.0 by default (verified from `next start --help`).
     startCommand: npm start
@@ -44,9 +50,9 @@ services:
     # a static page that renders from local sample data with no
     # database call, so it returns 200 even before the DB is ready.
     healthCheckPath: /
-    # First migration exists (prisma/migrations/20261108202200_init),
-    # so Render applies it automatically on every deploy.
-    preDeployCommand: npx prisma migrate deploy
+    # Free tier does not support preDeployCommand, so there is no
+    # preDeployCommand here. The migration runs at the end of
+    # buildCommand instead (see above).
     envVars:
       - key: NODE_VERSION
         value: "24"
