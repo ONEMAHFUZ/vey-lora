@@ -37,12 +37,21 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    // Carry the user id (and role) through the JWT into the session, so
+    // server code (e.g. src/lib/usage.ts getSessionUser) can identify the
+    // signed-in user. Without the id, signed-in users look like guests.
     async jwt({ token, user }) {
-      if (user) token.role = (user as { role?: string }).role;
+      if (user) {
+        token.id = (user as { id?: string }).id;
+        token.role = (user as { role?: string }).role;
+      }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) (session.user as { role?: string }).role = token.role as string;
+      if (session.user) {
+        (session.user as { id?: string }).id = token.id as string;
+        (session.user as { role?: string }).role = token.role as string;
+      }
       return session;
     },
   },
