@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 
@@ -7,7 +6,15 @@ import { hashPassword } from "@/lib/auth";
 // wired, so the account is active immediately. Redirects (303) so the
 // browser follows with a GET: success -> /auth/signin?registered=1,
 // problems -> /auth/signup?error=...
+// The redirect Location is RELATIVE on purpose: building it from req.url
+// breaks on Render, where the service is reached internally as
+// https://localhost:10000 and req.url carries that origin, sending the
+// browser to localhost (ERR_CONNECTION_REFUSED) after a successful signup.
 const FREE_PLAN_CREDITS = 20;
+
+function redirect303(path: string) {
+  return new Response(null, { status: 303, headers: { Location: path } });
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,12 +24,12 @@ export async function POST(req: Request) {
     const password = String(form.get("password") ?? "");
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
-      return NextResponse.redirect(new URL("/auth/signup?error=invalid", req.url), 303);
+      return redirect303("/auth/signup?error=invalid");
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return NextResponse.redirect(new URL("/auth/signup?error=exists", req.url), 303);
+      return redirect303("/auth/signup?error=exists");
     }
 
     const passwordHash = await hashPassword(password);
@@ -35,9 +42,9 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.redirect(new URL("/auth/signin?registered=1", req.url), 303);
+    return redirect303("/auth/signin?registered=1");
   } catch (err) {
     console.error("Signup failed:", err);
-    return NextResponse.redirect(new URL("/auth/signup?error=server", req.url), 303);
+    return redirect303("/auth/signup?error=server");
   }
 }
