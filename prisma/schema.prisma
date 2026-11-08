@@ -1,0 +1,345 @@
+// VEY LORA — Prisma schema (PostgreSQL). No live database is connected in this
+// workspace; run `prisma migrate dev` against a real PostgreSQL instance.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  GUEST
+  USER
+  CREATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  role          Role      @default(USER)
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  profile       UserProfile?
+  creator       CreatorProfile?
+  reviews       AIToolReview[]
+  favorites     FavoriteTool[]
+  subscriptions UserSubscription[]
+  payments      Payment[]
+  usage         UsageRecord[]
+  credit        CreditBalance?
+  notifications Notification[]
+  tickets       SupportTicket[]
+  auditLogs     AuditLog[]
+  @@index([role])
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio       String?
+  avatarUrl String?
+  country   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AICategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  icon        String?
+  tools       AITool[]
+  createdAt   DateTime @default(now())
+}
+
+model AITool {
+  id              String         @id @default(cuid())
+  name            String
+  slug            String         @unique
+  description     String
+  longDescription String?
+  logoUrl         String?
+  websiteUrl      String?
+  categoryId      String
+  category        AICategory     @relation(fields: [categoryId], references: [id])
+  pricingType     String         // FREE | PAID | FREEMIUM
+  priceMonthly    Decimal?       @db.Decimal(10, 2)
+  demoAvailable   Boolean        @default(false)
+  isPublished     Boolean        @default(false)
+  isSample        Boolean        @default(false) // SAMPLE data flag — never present as real
+  languages       String[]       @default([])
+  creatorId       String?
+  creator         CreatorProfile? @relation(fields: [creatorId], references: [id])
+  features        AIToolFeature[]
+  reviews         AIToolReview[]
+  favorites       FavoriteTool[]
+  usage           UsageRecord[]
+  submissions     ToolSubmission[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isPublished])
+}
+
+model AIToolFeature {
+  id        String @id @default(cuid())
+  toolId    String
+  tool      AITool @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  title     String
+  detail    String?
+  @@index([toolId])
+}
+
+model AIToolReview {
+  id        String   @id @default(cuid())
+  toolId    String
+  tool      AITool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  isSample  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@unique([toolId, userId])
+  @@index([toolId])
+}
+
+model FavoriteTool {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolId    String
+  tool      AITool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([userId, toolId])
+}
+
+model SubscriptionPlan {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  tier          PlanTier @unique
+  priceMonthly  Decimal  @db.Decimal(10, 2)
+  priceYearly   Decimal  @db.Decimal(10, 2)
+  monthlyCredits Int
+  description   String?
+  stripePriceId String?  @unique
+  isActive      Boolean  @default(true)
+  subscriptions UserSubscription[]
+  createdAt     DateTime @default(now())
+}
+
+model UserSubscription {
+  id                   String             @id @default(cuid())
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?            @unique
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("USD")
+  status          PaymentStatus @default(PENDING)
+  stripePaymentId String?       @unique
+  stripeInvoiceId String?
+  createdAt       DateTime      @default(now())
+  @@index([userId])
+  @@index([status])
+}
+
+model UsageRecord {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  toolId    String?
+  tool      AITool?  @relation(fields: [toolId], references: [id], onDelete: SetNull)
+  demoKey   String
+  provider  String?  // e.g. "gemini" | "groq" | "local-demo" (Phase B)
+  model     String?  // provider model id that served the request
+  tokens    Int      @default(0)
+  costUsd   Decimal  @default(0) @db.Decimal(10, 4)
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([demoKey])
+  @@index([createdAt])
+}
+
+// Admin-configurable AI provider selection (Phase B). One active row
+// (key "primary"). API KEYS ARE NEVER STORED HERE — keys live only in
+// server env vars (GEMINI_API_KEY, GROQ_API_KEY).
+model ProviderConfig {
+  id               String   @id @default(cuid())
+  key              String   @unique @default("primary")
+  primaryProvider  String   @default("gemini")
+  primaryModel     String?
+  fallbackProvider String?
+  fallbackModel    String?
+  dailyLimitGuest  Int      @default(5)
+  updatedBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model CreditBalance {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model CreatorProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  bio         String?
+  websiteUrl  String?
+  payoutEmail String?
+  tools       AITool[]
+  submissions ToolSubmission[]
+  createdAt   DateTime @default(now())
+}
+
+model ToolSubmission {
+  id          String           @id @default(cuid())
+  creatorId   String
+  creator     CreatorProfile   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  toolId      String?
+  tool        AITool?          @relation(fields: [toolId], references: [id], onDelete: SetNull)
+  title       String
+  description String
+  status      SubmissionStatus @default(SUBMITTED)
+  reviewNote  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  @@index([creatorId])
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId, isRead])
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String
+  coverUrl    String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([slug])
+}
+
+model Coupon {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  discountPercent Int
+  maxUses        Int?
+  usedCount      Int      @default(0)
+  expiresAt      DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id        String       @id @default(cuid())
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subject   String
+  message   String
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  @@index([status])
+}
+
+model NewsletterSubscriber {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  isActive     Boolean  @default(true)
+  subscribedAt DateTime @default(now())
+}

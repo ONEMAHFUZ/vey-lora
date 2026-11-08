@@ -1,0 +1,3 @@
+export default function Terms() {
+  return <div className="mx-auto max-w-4xl px-4 py-10"><h1 className="text-3xl font-bold">Terms of Service</h1><p className="mt-4 text-slate-300">By using VEY LORA you agree to use AI tools lawfully, not to abuse demo limits or attempt to bypass access controls, and that creators may only publish tools they own or are authorised to distribute. Subscriptions are billed per the chosen plan; refunds follow the payment provider&apos;s policy. Demo outputs from the local demo provider are rule-based samples, not live AI model output. This is a foundation terms text; have it reviewed by counsel before launch.</p></div>;
+}

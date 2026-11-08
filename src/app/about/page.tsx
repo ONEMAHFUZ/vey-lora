@@ -1,0 +1,3 @@
+export default function About() {
+  return <div className="mx-auto max-w-4xl px-4 py-10"><h1 className="text-3xl font-bold">About Us</h1><p className="mt-4 text-slate-300">VEY LORA is an AI tools marketplace and SaaS platform. Our mission: help anyone discover, try, and subscribe to AI tools in one place. Tagline: Discover. Try. Subscribe.</p><p className="mt-4 text-slate-300">This foundation build ships the marketplace, demo engine, subscriptions (test mode), creator submissions and admin tooling. Real tool listings, reviews and usage statistics will replace the labelled SAMPLE data as creators onboard.</p></div>;
+}

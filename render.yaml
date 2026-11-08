@@ -1,0 +1,73 @@
+# VEY LORA — Render Blueprint (free tier, Option B in DEPLOY.md)
+#
+# How this is used (no deploy happens from here):
+#   1. Push this source folder to a GitHub repo (no .env file — it is
+#      gitignored; render.yaml itself contains NO secrets).
+#   2. In the Render dashboard: New + -> Blueprint -> connect that repo.
+#      Render reads this file and creates the web service below.
+#   3. Set the env vars marked `sync: false` in the Render dashboard
+#      (Environment tab) — they are NOT in this file. The service will
+#      not work until DATABASE_URL and DIRECT_URL (Neon) are set.
+#   4. Deploy. First deploy needs a database first: create the Neon
+#      project, then run `npx prisma migrate deploy` once (see DEPLOY.md
+#      section 2) before the first real traffic, or the app has no tables.
+#
+# Free-tier facts (Render, checked 2026-11-08): 750 hours/month,
+# 512 MB RAM, the service spins down after 15 minutes idle and cold-
+# starts on the next visit. That is expected on the free tier.
+#
+# Node version: pinned to major line 24 (NODE_VERSION "24").
+# Render's current default Node is 24.22.1 — the exact version this
+# build is green on locally — and 22/24 are the active LTS lines.
+# Node 20 is end of life on Render, so it is NOT pinned here.
+# Render resolves "24" to the latest 24.x patch at build time.
+
+services:
+  - type: web
+    name: vey-lora
+    runtime: node
+    # Closest Render region to the users (Bangladesh). Change if needed.
+    region: singapore
+    plan: free
+    # Render runs this on a normal build machine with full network
+    # access, so `prisma generate` downloads its engine binaries
+    # itself. The local curl workaround for the Prisma ECONNRESET
+    # (see DEPLOY.md section 6) is NOT needed on Render.
+    # `npm run build` already runs `prisma generate && next build`;
+    # generate is listed explicitly so it runs even if that script
+    # is ever changed.
+    buildCommand: npm install && npx prisma generate && npm run build
+    # `next start` reads Render's PORT env var automatically and
+    # binds 0.0.0.0 by default (verified from `next start --help`).
+    startCommand: npm start
+    # No /api/health route exists in this app. The home page (/) is
+    # a static page that renders from local sample data with no
+    # database call, so it returns 200 even before the DB is ready.
+    healthCheckPath: /
+    # First migration exists (prisma/migrations/20261108202200_init),
+    # so Render applies it automatically on every deploy.
+    preDeployCommand: npx prisma migrate deploy
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Set these in the Render dashboard (sync: false = Render does
+      # NOT read a value from this file; the value lives only in the
+      # dashboard). Never put a real value here.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
